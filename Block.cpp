@@ -1,18 +1,20 @@
 #include<windows.h>
 #include<time.h>
-#define BLOCKSIZE 10
+#define BLOCKSIZE 16
 #define COLNUM 20
 #define ROWNUM 30
-LPCWSTR lpTitle = L"Block";                  // ±ÍÃ‚¿∏Œƒ±æ
-LPCWSTR lpWindowClass = L"Block";            // ÷˜¥∞ø⁄¿‡√˚
+LPCWSTR lpTitle = L"Block";                  // Ê†áÈ¢òÊ†èÊñáÊú¨
+LPCWSTR lpWindowClass = L"Block";            // ‰∏ªÁ™óÂè£Á±ªÂêç
+
 enum EBlockType
 {
 	BT_RECT,
+	BT_LINE,
 	BT_T,
 	BT_Z,
+	BT_RZ,
 	BT_7,
-	BT_LINE,
-	BT_S,
+	BT_R7,
 	BT_MAX
 };
 EBlockType currentBlockType = EBlockType::BT_RECT;
@@ -22,10 +24,18 @@ bool blockFlags[ROWNUM][COLNUM];
 int Speed = 5;
 int gameAreaLeft = BLOCKSIZE;
 int gameAreaTop = BLOCKSIZE;
+bool bStopGame = true;
 
 void ResetGame();
-bool GetValidFoodPosition(POINT& position);
+void StartGame();
+void CreateNewBlock();
+bool CanRotate();
+void ToNextRotator();
+bool StepDown();
+void RemoveLines();
+bool StepLeftRight(int step);
 void Render(HDC hdc);
+
 void CALLBACK BlockTimerProc(HWND hWnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
 LRESULT CALLBACK BlockWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -73,10 +83,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 void ResetGame()
 {
+	bStopGame = true;
 	currentBlockType = EBlockType::BT_RECT;
 	blockPosition.x = COLNUM / 2;
 	blockPosition.y = 0;
-	
+
 	for (int i = 0; i < 4; i++)
 	{
 		blockPoints[i].x = i;
@@ -89,11 +100,17 @@ void ResetGame()
 			blockFlags[row][col] = false;
 		}
 	}
-	srand(time(0));
 }
-void CreatNewBlock()
+
+void StartGame()
 {
-	blockPosition.x = COLNUM / 2-1;
+	srand(time(0));
+	CreateNewBlock();
+	bStopGame = false;
+}
+void CreateNewBlock()
+{
+	blockPosition.x = COLNUM / 2 - 1;
 	blockPosition.y = 0;
 	EBlockType type = (EBlockType)(rand() % BT_MAX);
 	currentBlockType = type;
@@ -103,44 +120,51 @@ void CreatNewBlock()
 	{
 		for (int i = 0; i < 4; i++)
 		{
-			blockPoints[i].x = i<2?i-1:i-3;
-			blockPoints[i].y = i<2?0:1;
+			blockPoints[i].x = i < 2 ? i - 1 : i - 3;
+			blockPoints[i].y = i < 2 ? 0 : 1;
 		}
 	}
+	break;
+	case BT_LINE:
+		for (int i = 0; i < 4; i++)
+		{
+			blockPoints[i].x = i - 2;
+			blockPoints[i].y = 0;
+		}
 		break;
 	case BT_T:
 		for (int i = 0; i < 4; i++)
 		{
-			blockPoints[i].x = i<3?i-1:0;
-			blockPoints[i].y = i<3?0:1;
+			blockPoints[i].x = i < 3 ? i - 1 : 0;
+			blockPoints[i].y = i < 3 ? -1 : 0;
 		}
 		break;
 	case BT_Z:
 		for (int i = 0; i < 4; i++)
 		{
-			blockPoints[i].x = i < 2 ? i -1 : i-2;
-			blockPoints[i].y = i < 2 ? 0 : 1;
+			blockPoints[i].x = i < 2 ? i - 1 : i - 2;
+			blockPoints[i].y = i < 2 ? -1 : 0;
+		}
+		break;
+	case BT_RZ:
+		for (int i = 0; i < 4; i++)
+		{
+			blockPoints[i].x = i < 2 ? i : i - 3;
+			blockPoints[i].y = i < 2 ? -1 : 0;
 		}
 		break;
 	case BT_7:
 		for (int i = 0; i < 4; i++)
 		{
 			blockPoints[i].x = i < 2 ? i-1 : 0;
-			blockPoints[i].y = i < 2 ? 0 : i-1;
+			blockPoints[i].y = i < 2 ? -1 : i - 2;
 		}
 		break;
-	case BT_LINE:
+	case BT_R7:
 		for (int i = 0; i < 4; i++)
 		{
-			blockPoints[i].x = i-1;
-			blockPoints[i].y = 0;
-		}
-		break;
-	case BT_S:
-		for (int i = 0; i < 4; i++)
-		{
-			blockPoints[i].x = i < 2 ? i : i-3;
-			blockPoints[i].y = i < 2 ? 0 : 1;
+			blockPoints[i].x = i < 2 ? i : 0;
+			blockPoints[i].y = i < 2 ? -1 : i - 2;
 		}
 		break;
 	case BT_MAX:
@@ -148,9 +172,15 @@ void CreatNewBlock()
 	default:
 		break;
 	}
+	//blockPoints->x += blockPoints[0].x;
+	blockPosition.y -= blockPoints[0].y;
 }
 bool CanRotate()
 {
+	if (currentBlockType == EBlockType::BT_RECT)
+	{
+		return false;
+	}
 	for (int i = 0; i < 4; i++)
 	{
 		int tmpx = -blockPoints[i].y + blockPosition.x;
@@ -166,6 +196,10 @@ bool CanRotate()
 }
 void ToNextRotator()
 {
+	if (currentBlockType == EBlockType::BT_RECT)
+	{
+		return;
+	}
 	//(x,y)=>(-y,x)
 	for (int i = 0; i < 4; i++)
 	{
@@ -196,7 +230,7 @@ bool StepLeftRight(int step)
 		int top = blockPosition.y + blockPoints[i].y;
 		int left = blockPosition.x + blockPoints[i].x;
 		int nextLeft = left + step;
-		if(nextLeft >= COLNUM || nextLeft < 0 || blockFlags[top][nextLeft])
+		if (nextLeft >= COLNUM || nextLeft < 0 || blockFlags[top][nextLeft])
 		{
 			return false;
 		}
@@ -204,8 +238,37 @@ bool StepLeftRight(int step)
 	blockPosition.x += step;
 	return true;
 }
+void RemoveLines()
+{
+	for (int row = 0; row < ROWNUM; row++)
+	{
+		bool bFull = true;
+		for (int col = 0; col < COLNUM; col++)
+		{
+			if (!blockFlags[row][col])
+			{
+				bFull = false;
+				break;
+			}
+		}
+		if (bFull)
+		{
+			for (int r = row; r >= 0; r--)
+			{
+				for (int c = 0; c < COLNUM; c++)
+				{
+					blockFlags[r][c] = r==0?false:blockFlags[r - 1][c];
+				}
+			}
+		}
+	}
+}
 void CALLBACK BlockTimerProc(HWND hWnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime)
 {
+	if (bStopGame)
+	{
+		return;
+	}
 	bool canDown = StepDown();
 	if (!canDown)
 	{
@@ -215,13 +278,15 @@ void CALLBACK BlockTimerProc(HWND hWnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTim
 		}
 		else
 		{
+
 			for (int i = 0; i < 4; i++)
 			{
 				int row = blockPosition.y + blockPoints[i].y;
 				int col = blockPosition.x + blockPoints[i].x;
 				blockFlags[row][col] = true;
 			}
-			CreatNewBlock();
+			RemoveLines();
+			CreateNewBlock();
 		}
 	}
 	::InvalidateRect(hWnd, nullptr, TRUE);
@@ -236,7 +301,7 @@ void Render(HDC hdc)
 	{//DrawWall
 		int left = gameAreaLeft - BLOCKSIZE;
 		int top = gameAreaTop - BLOCKSIZE;
-		int right = gameAreaLeft + (COLNUM + 1)*BLOCKSIZE;
+		int right = gameAreaLeft + (COLNUM + 1) * BLOCKSIZE;
 		int bottom = gameAreaTop;
 		Rectangle(hdc, left, top, right, bottom);
 
@@ -259,23 +324,26 @@ void Render(HDC hdc)
 	HBRUSH hBlackBrush = CreateSolidBrush(RGB(20, 20, 20));
 	::SelectObject(hdc, hBlackBrush);
 	//DrawBlock
-	for (int row = 0; row < ROWNUM; row++)
+	if (!bStopGame)
 	{
-		for (int col = 0; col < COLNUM; col++)
+		for (int row = 0; row < ROWNUM; row++)
 		{
-			if (blockFlags[row][col])
+			for (int col = 0; col < COLNUM; col++)
 			{
-				int left = gameAreaLeft + col*BLOCKSIZE;
-				int top = gameAreaTop + row*BLOCKSIZE;
-				Rectangle(hdc, left, top, left + BLOCKSIZE, top + BLOCKSIZE);
+				if (blockFlags[row][col])
+				{
+					int left = gameAreaLeft + col * BLOCKSIZE;
+					int top = gameAreaTop + row * BLOCKSIZE;
+					Rectangle(hdc, left, top, left + BLOCKSIZE, top + BLOCKSIZE);
+				}
 			}
 		}
-	}
-	for (int i = 0; i < 4; i++)
-	{
-		int left = gameAreaLeft + (blockPosition.x+blockPoints[i].x)*BLOCKSIZE;
-		int top = gameAreaTop + (blockPosition.y+ blockPoints[i].y)*BLOCKSIZE;
-		Rectangle(hdc, left, top, left + BLOCKSIZE, top + BLOCKSIZE);
+		for (int i = 0; i < 4; i++)
+		{
+			int left = gameAreaLeft + (blockPosition.x + blockPoints[i].x) * BLOCKSIZE;
+			int top = gameAreaTop + (blockPosition.y + blockPoints[i].y) * BLOCKSIZE;
+			Rectangle(hdc, left, top, left + BLOCKSIZE, top + BLOCKSIZE);
+		}
 	}
 	SelectObject(hdc, hOldBrush);
 	SelectObject(hdc, hOldPen);
@@ -331,7 +399,23 @@ LRESULT CALLBACK BlockWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 			break;
 		case VK_SPACE:
 		{
-			ToNextRotator();
+			if (CanRotate())
+			{
+				ToNextRotator();
+			}
+			break;
+		}
+		case VK_BACK:
+		{
+			ResetGame();
+			break;
+		}
+		case 0x0d:
+		{
+			if (bStopGame)
+			{
+				StartGame();
+			}
 			break;
 		}
 		default:

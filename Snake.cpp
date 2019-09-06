@@ -1,9 +1,9 @@
 #include<windows.h>
 #include<list>
 #include<time.h>
-#define BLOCKSIZE 10
-LPCWSTR lpTitle = L"Snake";                  // ±ÍÃ‚¿∏Œƒ±æ
-LPCWSTR lpWindowClass = L"Snake";            // ÷˜¥∞ø⁄¿‡√˚
+#define BLOCKSIZE 20
+LPCWSTR lpTitle = L"Snake";                  // Ê†áÈ¢òÊ†èÊñáÊú¨
+LPCWSTR lpWindowClass = L"Snake";            // ‰∏ªÁ™óÂè£Á±ªÂêç
 
 struct Food
 {
@@ -14,8 +14,8 @@ POINT snakePosition;
 POINT snakeVelocity;
 std::list<POINT> snakePoints;
 std::list<Food> foodList;
-int rowNum = 40;
-int colNum = 40;
+int rowNum = 20;
+int colNum = 20;
 int Speed = 2;
 int maxFoodNum = 1;
 int maxFoodTime = -1;
@@ -175,12 +175,12 @@ void Render(HDC hdc)
 {
 	HPEN hGrayPen = CreatePen(PS_SOLID, 1, RGB(100, 100, 100));
 	HPEN hOldPen = (HPEN)::SelectObject(hdc, hGrayPen);
-	HBRUSH hGrayBrush = CreateSolidBrush(RGB(100, 100,100));
+	HBRUSH hGrayBrush = CreateSolidBrush(RGB(100, 100, 100));
 	HBRUSH hOldBrush = (HBRUSH)::SelectObject(hdc, hGrayBrush);
 	{//DrawWall
 		int left = gameAreaLeft - BLOCKSIZE;
 		int top = gameAreaTop - BLOCKSIZE;
-		int right = gameAreaLeft + (colNum + 1)*BLOCKSIZE;
+		int right = gameAreaLeft + (colNum + 1) * BLOCKSIZE;
 		int bottom = gameAreaTop;
 		Rectangle(hdc, left, top, right, bottom);
 
@@ -198,23 +198,24 @@ void Render(HDC hdc)
 		right = left + BLOCKSIZE;
 		Rectangle(hdc, left, top, right, bottom);
 	}
-	HPEN hBlackPen = CreatePen(PS_SOLID, 1, RGB(0, 0, 0));
+	HPEN hBlackPen = CreatePen(PS_SOLID, 1, RGB(80, 80, 80));
 	::SelectObject(hdc, hBlackPen);
 	HBRUSH hBlackBrush = CreateSolidBrush(RGB(0, 0, 0));
 	::SelectObject(hdc, hBlackBrush);
 	//DrawSnakeAndFood
 	for (auto iter = snakePoints.begin(); iter != snakePoints.end(); iter++)
 	{
-		int left = gameAreaLeft + iter->x*BLOCKSIZE;
-		int top  = gameAreaTop + iter->y*BLOCKSIZE;
-		Rectangle(hdc, left, top, left+ BLOCKSIZE, top + BLOCKSIZE);
+		int left = gameAreaLeft + iter->x * BLOCKSIZE;
+		int top = gameAreaTop + iter->y * BLOCKSIZE;
+		Rectangle(hdc, left, top, left + BLOCKSIZE, top + BLOCKSIZE);
 	}
 	for (auto iter = foodList.begin(); iter != foodList.end(); iter++)
 	{
 		POINT& pt = iter->position;
-		int left = gameAreaLeft + pt.x*BLOCKSIZE;
-		int top = gameAreaTop + pt.y*BLOCKSIZE;
-		Rectangle(hdc, left, top, left+ BLOCKSIZE, top + BLOCKSIZE);
+		int left = gameAreaLeft + pt.x * BLOCKSIZE;
+		int top = gameAreaTop + pt.y * BLOCKSIZE;
+		Ellipse(hdc, left, top, left + BLOCKSIZE, top + BLOCKSIZE);
+		//Rectangle(hdc, left, top, left + BLOCKSIZE, top + BLOCKSIZE);
 	}
 
 	SelectObject(hdc, hOldBrush);
@@ -231,7 +232,7 @@ LRESULT CALLBACK SnakeWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 	case WM_CREATE:
 	{
 		ResetGame();
-		SetTimer(hWnd, 100, 1000/Speed, (TIMERPROC)SnakeTimerProc);
+		SetTimer(hWnd, 100, 1000 / Speed, (TIMERPROC)SnakeTimerProc);
 		break;
 	}
 	case WM_LBUTTONDOWN:
@@ -259,20 +260,32 @@ LRESULT CALLBACK SnakeWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 		switch (wParam)
 		{
 		case VK_LEFT:
-			snakeVelocity.x = -1;
-			snakeVelocity.y = 0;
+			if (snakeVelocity.x != 1)
+			{
+				snakeVelocity.x = -1;
+				snakeVelocity.y = 0;
+			}
 			break;
 		case VK_RIGHT:
-			snakeVelocity.x = 1;
-			snakeVelocity.y = 0;
+			if (snakeVelocity.x != -1)
+			{
+				snakeVelocity.x = 1;
+				snakeVelocity.y = 0;
+			}
 			break;
 		case VK_UP:
-			snakeVelocity.x = 0;
-			snakeVelocity.y = -1;
+			if (snakeVelocity.y != 1)
+			{
+				snakeVelocity.x = 0;
+				snakeVelocity.y = -1;
+			}
 			break;
 		case VK_DOWN:
-			snakeVelocity.x = 0;
-			snakeVelocity.y = 1;
+			if (snakeVelocity.y != -1)
+			{
+				snakeVelocity.x = 0;
+				snakeVelocity.y = 1;
+			}
 			break;
 		default:
 			break;
